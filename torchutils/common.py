@@ -1,12 +1,15 @@
 import os
+import inspect
 import random
 import subprocess
+from functools import wraps
+
 import numpy
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from .distributed import torchsave
+from .distributed import torchsave, is_master
 
 
 def generate_random_seed():
@@ -62,7 +65,8 @@ def compute_flops(module: nn.Module, size):
 
 def get_last_commit_id():
     try:
-        commit_id = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8")
+        commit_id = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD']).decode("utf-8")
         commit_id = commit_id.strip()
         return commit_id
     except subprocess.CalledProcessError as e:
@@ -87,6 +91,7 @@ def save_checkpoint(output_directory, epoch, model: nn.Module,
     torchsave(ckpt, os.path.join(output_directory, "checkpoint.pth"))
     if epoch == best_epoch:
         torchsave(ckpt, os.path.join(output_directory, "best.pth"))
+
 
 class GradientAccumulator:
     def __init__(self, steps=1):
@@ -120,3 +125,59 @@ class GradientAccumulator:
             optimizer.step()
 
         self.inc_counter()
+
+
+def dummy_func(*args, **kargs):
+    pass
+
+
+class DummyClass:
+    def __getattribute__(self, obj):
+        return dummy_func
+
+
+class FakeObj:
+    def __getattr__(self, name):
+        return do_nothing
+
+
+def do_nothing(*args, **kwargs) -> FakeObj:
+    return FakeObj()
+
+
+def only_master_fn(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if is_master() or kwargs.get('run_anyway', False):
+            kwargs.pop('run_anyway', None)
+            return fn(*args, **kwargs)
+        else:
+            return FakeObj()
+
+    return wrapper
+
+
+def only_master_cls(cls):
+    for key, value in cls.__dict__.items():
+        if callable(value):
+            setattr(cls, key, only_master_fn(value))
+
+    return cls
+
+
+def only_master_obj(obj):
+    cls = obj.__class__
+    for key, value in cls.__dict__.items():
+        if callable(value):
+            obj.__dict__[key] = only_master_fn(value).__get__(obj, cls)
+
+    return obj
+
+
+def only_master(something):
+    if inspect.isfunction(something):
+        return only_master_fn(something)
+    elif inspect.isclass(something):
+        return only_master_cls(something)
+    else:
+        return only_master_obj(something)
