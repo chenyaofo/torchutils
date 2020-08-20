@@ -9,7 +9,7 @@ from .log import get_logger, LogExceptionHook, create_code_snapshot
 from .common import DummyClass
 
 
-__version__ = "v0.1.0-alpha0"
+__version__ = "v0.1.1-alpha0"
 
 __all__ = [
     "logger",

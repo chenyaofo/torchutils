@@ -1,4 +1,5 @@
 import os
+import socket
 import inspect
 import random
 import subprocess
@@ -74,6 +75,36 @@ def get_last_commit_id():
         code = e.returncode
         return None
 
+def get_branch_name():
+    try:
+        branch_name = subprocess.check_output(
+            ['git', 'symbolic-ref', '--short', '-q', 'HEAD']).decode("utf-8")
+        branch_name = branch_name.strip()
+        return branch_name
+    except subprocess.CalledProcessError as e:
+        out_bytes = e.output
+        code = e.returncode
+        return None
+
+def get_gpus_memory_info():
+    try:
+        query_rev = subprocess.check_output(
+            ['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader']).decode("utf-8")
+        gpus_memory_info = []
+        for item in query_rev.split("\n")[:-1]:
+            gpus_memory_info.append(list(map(lambda x:int(x.replace(" MiB", "")), item.split(","))))
+        return gpus_memory_info
+    except subprocess.CalledProcessError as e:
+        out_bytes = e.output
+        code = e.returncode
+        return None
+
+def get_free_port():  
+    sock = socket.socket()
+    sock.bind(('', 0))
+    ip, port = sock.getnameinfo()
+    sock.close()
+    return port
 
 def save_checkpoint(output_directory, epoch, model: nn.Module,
                     optimizer: optim.Optimizer, best_acc1, best_acc5, best_epoch):

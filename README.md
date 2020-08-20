@@ -11,6 +11,10 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v0.1.1
+
+ - Add three utility function: get_branch_name, get_gpus_memory_info, get_free_port
+
 ### v0.1.0
 
  - Automatically initialize distributed mode according to env variables
