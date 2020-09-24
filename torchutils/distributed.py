@@ -4,8 +4,23 @@ import typing
 import torch
 import torch.distributed as dist
 
+def patch_OpenPAI_env():
+    DISTRIBUTED_SYNC_PORT = "distributed_sync_port" # !!! assume the port label for distributed sync is "distributed_sync_port"
+    if "PAI_USER_NAME" in os.environ:
+        # env "PAI_USER_NAME" exists, that means the job is run by OpenPAI
+        # here we copy some essential env variables from OpenPAI preprocessing script
+        taskrole = os.environ["PAI_CURRENT_TASK_ROLE_NAME"]
+        n_instances = int(os.environ[f"PAI_TASK_ROLE_TASK_COUNT_{taskrole}"])
+        if n_instances > 1: # running with distributed mode in OpenPAI
+            # refer to 'https://openpai.readthedocs.io/en/latest/manual/cluster-user/how-to-use-advanced-job-settings.html#environmental-variables-and-port-reservation'
+            os.environ['WORLD_SIZE'] = os.environ[f"PAI_TASK_ROLE_TASK_COUNT_{taskrole}"]
+            os.environ['MASTER_ADDR'] = os.environ[f'PAI_HOST_IP_{taskrole}_0']
+            os.environ['MASTER_PORT'] = os.environ[f'PAI_worker_0_{DISTRIBUTED_SYNC_PORT}_PORT']
+            os.environ["RANK"] = os.environ["PAI_CURRENT_TASK_ROLE_CURRENT_TASK_INDEX"]
+            os.environ["LOCAL_RANK"] = str(0)
 
 def init(backend="nccl", init_method="env://"):
+    patch_OpenPAI_env()
     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
         if dist.is_available():
             rank = int(os.environ["RANK"])
