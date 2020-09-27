@@ -15,7 +15,7 @@ def patch_OpenPAI_env():
             # refer to 'https://openpai.readthedocs.io/en/latest/manual/cluster-user/how-to-use-advanced-job-settings.html#environmental-variables-and-port-reservation'
             os.environ['WORLD_SIZE'] = os.environ[f"PAI_TASK_ROLE_TASK_COUNT_{taskrole}"]
             os.environ['MASTER_ADDR'] = os.environ[f'PAI_HOST_IP_{taskrole}_0']
-            os.environ['MASTER_PORT'] = os.environ[f'PAI_worker_0_{DISTRIBUTED_SYNC_PORT}_PORT']
+            os.environ['MASTER_PORT'] = os.environ[f'PAI_{taskrole}_0_{DISTRIBUTED_SYNC_PORT}_PORT']
             os.environ["RANK"] = os.environ["PAI_CURRENT_TASK_ROLE_CURRENT_TASK_INDEX"]
             os.environ["LOCAL_RANK"] = str(0)
 
