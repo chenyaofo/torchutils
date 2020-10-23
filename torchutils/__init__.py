@@ -32,10 +32,11 @@ args = get_args(sys.argv)
 output_directory = args.output_directory
 
 if is_master():
-    os.makedirs(args.output_directory, exist_ok=False)
+    if output_directory is not None:
+        os.makedirs(args.output_directory, exist_ok=False)
+        create_code_snapshot("code", [".py"], ".", args.output_directory)
     logger = get_logger("project", args.output_directory, "log.txt")
     sys.excepthook = LogExceptionHook(logger)
-    create_code_snapshot("code", [".py"], ".", args.output_directory)
     if output_directory is None:
         summary_writer = DummyClass()
     else:
