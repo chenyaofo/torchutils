@@ -11,6 +11,10 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v0.1.3
+
+ - Add diagnostic infos to output directory automatically
+
 ### v0.1.2
 
  - Add support to run in OpenPAI: automatically detect whether runing in OpenPAI, copy env variables from OpenPAI to init distributed mode

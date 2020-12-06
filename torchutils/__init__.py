@@ -5,11 +5,11 @@ import argparse
 from torch.utils.tensorboard import SummaryWriter
 
 from .distributed import init, is_master
-from .log import get_logger, LogExceptionHook, create_code_snapshot
+from .log import get_logger, LogExceptionHook, create_code_snapshot, get_diagnostic_info
 from .common import DummyClass
 
 
-__version__ = "v0.1.2-alpha0"
+__version__ = "v0.1.3-alpha0"
 
 __all__ = [
     "logger",
@@ -35,6 +35,8 @@ if is_master():
     if output_directory is not None:
         os.makedirs(args.output_directory, exist_ok=False)
         create_code_snapshot("code", [".py"], ".", args.output_directory)
+        with open(os.path.join(args.output_directory, ".diagnostic_info"), "w") as f:
+            f.write(get_diagnostic_info())
     logger = get_logger("project", args.output_directory, "log.txt")
     sys.excepthook = LogExceptionHook(logger)
     if output_directory is None:
