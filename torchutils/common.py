@@ -12,6 +12,7 @@ import torch.optim as optim
 
 from .distributed import torchsave, is_master
 
+auto_device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 def is_running_in_openpai():
     # refer to 'https://openpai.readthedocs.io/en/latest/manual/cluster-user/how-to-use-advanced-job-settings.html#environmental-variables-and-port-reservation'
