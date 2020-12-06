@@ -64,9 +64,9 @@ def get_diagnostic_info():
     diagnostic_info += f"Git Commit ID: {get_last_commit_id()}\n\n"
 
     diagnostic_info += f"More Diagnostic Info: \n"
-    diagnostic_info += "-" * 30
+    diagnostic_info += "-" * 50 + "\n"
     diagnostic_info += get_pretty_env_info() + "\n"
-    diagnostic_info += "-" * 30 + "\n"
+    diagnostic_info += "-" * 50 + "\n"
     
 
     return diagnostic_info
