@@ -161,6 +161,10 @@ def main():
     args.nproc_per_node = n_gpus
     args.master_addr = "127.0.0.1"
     args.master_port = get_free_port()
+    args.use_env = False
+    args.module = False
+    args.no_python = False
+
 
     # world size in terms of number of processes
     dist_world_size = args.nproc_per_node * args.nnodes
