@@ -11,6 +11,10 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v0.2.0
+
+ - Add `torchutils.snmp_launch` to quickly start Single-Node multi-process distributed training. 
+
 ### v0.1.3
 
  - Add diagnostic infos to output directory automatically
