@@ -11,6 +11,9 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v0.2.1
+ - Add `ModelEma` and `unwarp_module` utility function/class.
+
 ### v0.2.0
 
  - Add `torchutils.snmp_launch` to quickly start Single-Node multi-process distributed training. 
@@ -34,3 +37,4 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
  - Metrics supported distributed mode, including Accuracy, ConfusionMatrix, AverageMetric
  - Common utilities, such as compute_flops, compute_nparams ...
  - Integrate typed_args library from https://github.com/SunDoge/typed-args/tree/v0.4
+ 
