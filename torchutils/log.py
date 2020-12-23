@@ -61,6 +61,7 @@ def create_code_snapshot(name: str,
 def get_diagnostic_info():
     diagnostic_info = f"Log Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n"
     diagnostic_info += f"UUID: {uuid.uuid1()}\n"
+    diagnostic_info += f"Argv: {' '.join(sys.argv)}\n"
     diagnostic_info += f"Git Branch: {get_branch_name()}\n"
     diagnostic_info += f"Git Commit ID: {get_last_commit_id()}\n\n"
 
