@@ -11,6 +11,9 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v0.2.2
+ - Add `GroupMetric` to fuse multiple metrics at the same time.
+
 ### v0.2.1
  - Add `ModelEma` and `unwarp_module` utility function/class.
 

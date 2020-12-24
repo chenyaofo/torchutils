@@ -206,7 +206,7 @@ class GroupMetric(object):
 
     def update(self, values):
         for m, v in zip(self.metrics, values):
-            if isinstance(values, (list, tuple)):
+            if isinstance(v, (list, tuple)):
                 m.update(*v)
             else:
                 m.update(v)
