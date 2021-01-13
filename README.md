@@ -1,8 +1,7 @@
-# PyTorch Utilities for Private Usage
+# PyTorch Utilities
 
-author: chenyaofo@gmail.com
-
-The library is designed for integration in the main project.
+## Get Started
+The library is designed to integrated in the main project.
 
 ``` bash
 git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo && mv torchutils_repo/torchutils . && rm -rf torchutils_repo
