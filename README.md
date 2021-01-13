@@ -11,6 +11,9 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v0.2.3
+ - Update `typed_args` to version 0.4.3, fix type hint of Args.
+
 ### v0.2.2
  - Add `GroupMetric` to fuse multiple metrics at the same time.
 
