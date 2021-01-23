@@ -9,28 +9,25 @@ This script aims to quickly start single-node multi-process distributed training
 import sys
 import subprocess
 import os
-import socket 
+import socket
 from argparse import ArgumentParser, REMAINDER
 
 
-def get_free_port():  
+def get_free_port():
     sock = socket.socket()
     sock.bind(('', 0))
     ip, port = sock.getsockname()
     sock.close()
     return port
 
+
 def parse_args():
-    """
-    Helper function parsing the command line options
-    @retval ArgumentParser
-    """
-    parser = ArgumentParser(description="PyTorch distributed training launch "
+    parser = ArgumentParser(description="TorchUitlity distributed training launch "
                                         "helper utility that will spawn up "
-                                        "multiple distributed processes")
+                                        "single-node multi-process jobs.")
 
     parser.add_argument("--gpus", default="0", type=str,
-                        help="CUDA_VISIBLE_DEVICES")
+                        help="The GPU ID to use (i.e., CUDA_VISIBLE_DEVICES).")
 
     # positional
     parser.add_argument("training_script", type=str,
@@ -43,13 +40,14 @@ def parse_args():
     parser.add_argument('training_script_args', nargs=REMAINDER)
     return parser.parse_args()
 
+
 def main():
     args = parse_args()
-    
+
     n_gpus = len(args.gpus.split(","))
 
     # here, we specify some command line parameters manually,
-    # since in Single-Node multi-process distributed training, they often are fixed or computable
+    # since in single-node multi-process distributed training, they often are fixed or computable
     args.nnodes = 1
     args.node_rank = 0
     args.nproc_per_node = n_gpus
@@ -58,7 +56,6 @@ def main():
     args.use_env = False
     args.module = False
     args.no_python = False
-
 
     # world size in terms of number of processes
     dist_world_size = args.nproc_per_node * args.nnodes

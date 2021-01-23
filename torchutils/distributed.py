@@ -24,7 +24,7 @@ def patch_OpenPAI_env() -> None:
             os.environ["LOCAL_RANK"] = str(0)
 
 
-def init(backend: str = "nccl", init_method: str = "env://") -> typing.Tuple[str, str, int, int, int, str, str]:
+def distributed_init(backend: str = "nccl", init_method: str = "env://") -> typing.Tuple[str, str, int, int, int, str, str]:
     """Quickly initialize the distributed mode in PyTorch by getting informations from environment variables and
     send these to dist.init_process_group.
 

@@ -10,6 +10,10 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v1.0.0
+ - Now, the `init` of `torchutils` is not run automatically
+ - Rename module `torchutils.snmp_launch` to `torchutils.launch`
+
 ### v0.2.3
  - Update `typed_args` to version 0.4.3, fix type hint of Args.
 

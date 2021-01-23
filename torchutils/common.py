@@ -14,8 +14,6 @@ import torch.optim as optim
 
 from .distributed import torchsave, is_master
 
-auto_device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
 
 def is_running_in_openpai() -> bool:
     """
