@@ -12,7 +12,7 @@ from .log import get_logger, LogExceptionHook, create_code_snapshot, get_diagnos
 from .common import DummyClass
 
 
-__version__ = "v1.0.0-alpha0"
+__version__ = "v1.0.1-alpha0"
 
 __all__ = [
     "auto_device",
@@ -77,3 +77,30 @@ def torchutils_init(output_directory_: pathlib.Path = output_directory,
     else:
         logger = DummyClass()
         summary_writer = DummyClass()
+
+
+def log2tb_stdout(epoch: int, iter_: int, prefix: str, metrics: dict, log_interval: int, is_last_iter: bool):
+    if is_last_iter:
+        for name, value in metrics.items():
+            if isinstance(value, (int, float)):
+                v = value
+            else:
+                v, *_ = value
+            summary_writer.add_scalar(prefix+"/"+name, v, epoch)
+    if iter_ % log_interval == 0 or is_last_iter:
+        log_buffer = []
+        if is_last_iter:
+            log_buffer.append(f"{prefix.upper()} Complete")
+        log_buffer.append(f"epoch={epoch:05d}")
+        log_buffer.append(f"iter={iter_:05d}")
+        for name, value in metrics.items():
+            if isinstance(value, (int, float)):
+                v = value
+                decimal_digits = 2
+                postfix = ""
+            else:
+                v, decimal_digits, postfix = value
+            v_str = f"{v:.10f}"
+            v_str = v_str[:-(10-decimal_digits)]
+            log_buffer.append(f"{name}={v_str}{postfix}")
+        logger.info(", ".join(log_buffer))

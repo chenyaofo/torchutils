@@ -10,6 +10,9 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v1.0.1
+ - add `log2tb_stdout` to output metric to tensorboard and stdout.
+
 ### v1.0.0
  - Now, the `init` of `torchutils` is not run automatically
  - Rename module `torchutils.snmp_launch` to `torchutils.launch`
