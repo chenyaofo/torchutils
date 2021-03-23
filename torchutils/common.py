@@ -9,6 +9,7 @@ from functools import wraps
 
 import numpy
 import torch
+import torch.hub as hub
 import torch.nn as nn
 import torch.optim as optim
 
@@ -327,3 +328,17 @@ def unwarp_module(model):
         return model.module
     else:
         return model
+
+
+def patch_download_in_cn():
+    def _cn_git_archive_link(repo_owner, repo_name, branch):
+        return 'https://download.fastgit.org/{}/{}/archive/{}.zip'.format(repo_owner, repo_name, branch)
+    hub._git_archive_link = _cn_git_archive_link
+
+    download_url_to_file = hub.download_url_to_file
+
+    def _cn_download_url_to_file(url: str, dst, hash_prefix=None, progress=True):
+        if url.startswith("https://github.com") and "releases" in url:
+            cdn_url = url.replace("https://github.com", "https://download.fastgit.org")
+            return download_url_to_file(cdn_url, dst, hash_prefix, progress)
+    hub.download_url_to_file = _cn_download_url_to_file

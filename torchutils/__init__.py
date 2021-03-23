@@ -12,7 +12,7 @@ from .log import get_logger, LogExceptionHook, create_code_snapshot, get_diagnos
 from .common import DummyClass
 
 
-__version__ = "v1.0.1-alpha0"
+__version__ = "v1.1.0-alpha0"
 
 __all__ = [
     "auto_device",

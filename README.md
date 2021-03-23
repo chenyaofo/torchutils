@@ -10,6 +10,10 @@ git clone --depth 1 https://github.com/chenyaofo/torchutils.git torchutils_repo 
 
 ## Changelogs
 
+### v1.1.0
+
+ - add `patch_download_in_cn` to accelerate the downloading.
+
 ### v1.0.1
  - add `log2tb_stdout` to output metric to tensorboard and stdout.
 
