@@ -100,7 +100,7 @@ def compute_flops(module: nn.Module, size: int) -> int:
             h, w = m.output_size
             kh, kw = m.kernel_size
             flops += h * w * m.in_channels * m.out_channels * kh * kw / m.groups
-        if isinstance(module, nn.Linear):
+        if isinstance(m, nn.Linear):
             flops += m.in_features * m.out_features
     return flops
 
