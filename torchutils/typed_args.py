@@ -153,8 +153,6 @@ class TypedArgs:
                 # We want inner type
                 argument_type = get_args(argument_type)[0]
 
-                # print('argument type: ', argument_type)
-
             if kwargs['action'] == 'store':
 
                 # 不存在default的才需要判断optional
@@ -302,9 +300,5 @@ def add_argument(
     """
     kwargs = locals()
     logger.debug('local = ', kwargs)
-
-    # print('=' * 100)
-    # print(kwargs)
-    # print('=' * 100)
 
     return PhantomAction(**kwargs)

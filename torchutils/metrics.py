@@ -12,9 +12,6 @@ _str_2_reduceop = dict(
     product=dist.ReduceOp.PRODUCT,
     min=dist.ReduceOp.MIN,
     max=dist.ReduceOp.MAX,
-    # band=dist.ReduceOp.BAND,
-    # bor=dist.ReduceOp.BOR,
-    # bxor=dist.ReduceOp.BXOR,
 )
 
 
@@ -85,7 +82,7 @@ class AccuracyMetric(object):
     def reset(self) -> None:
         self.accuracies = [Accuracy() for _ in self.topk]
 
-    def update(self, outputs, targets) -> None:
+    def update(self, outputs: torch.Tensor, targets: torch.Tensor) -> None:
         maxk = max(self.topk)
         batch_size = targets.size(0)
 
@@ -104,9 +101,13 @@ class AccuracyMetric(object):
         accuracy.sync()
         return accuracy
 
+    def __str__(self):
+        items = [f"top{k}-acc={self.at(k).rate*100:.2f}%" for k in self.topk]
+        return ", ".join(items)
+
 
 class ConfusionMatrix(object):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes: int):
         self._is_distributed = dist.is_available() and dist.is_initialized()
         self.num_classes = num_classes
         self.matrix = None
@@ -122,7 +123,7 @@ class ConfusionMatrix(object):
                                                    dtype=torch.int64, device="cuda")
         self._is_synced = True
 
-    def update(self, targets, predictions):
+    def update(self, targets: torch.Tensor, predictions: torch.Tensor):
         predictions = torch.argmax(predictions, dim=1)
         targets, predictions = targets.flatten(), predictions.flatten()
         indices = targets * self.num_classes + predictions
@@ -137,17 +138,17 @@ class ConfusionMatrix(object):
             return
         self._is_synced = True
 
-    def pixel_accuracy(self):
+    def pixel_accuracy(self) -> float:
         self.sync()
         m = self.matrix.float()
         return (m.diag().sum()/(m.sum()+EPSILON)).item()
 
-    def mean_pixel_accuracy(self):
+    def mean_pixel_accuracy(self) -> float:
         self.sync()
         m = self.matrix.float()
         return (m.diag()/m.sum(dim=1)).mean().item()
 
-    def mean_intersection_over_union(self):
+    def mean_intersection_over_union(self) -> float:
         self.sync()
         m = self.matrix.float()
         diag = m.diag()
@@ -155,7 +156,9 @@ class ConfusionMatrix(object):
 
 
 class AverageMetric(object):
-    def __init__(self):
+    def __init__(self, name, format_digits=4):
+        self.name = name
+        self.format_digits = format_digits
         self._is_distributed = dist.is_available() and dist.is_initialized()
         self.reset()
 
@@ -195,6 +198,9 @@ class AverageMetric(object):
         self.sync()
         return self._value / (self._n+EPSILON)
 
+    def __str__(self) -> str:
+        return f"{self.name}={self.compute():.{self.format_digits}f}"
+
 
 class GroupMetric(object):
     def __init__(self, n, metric_cls):
@@ -215,6 +221,20 @@ class GroupMetric(object):
         return [m.compute() for m in self.metrics]
 
 
+class MetricGroup(object):
+    def __init__(self, metrics=list()) -> None:
+        self.metrics = metrics
+
+    def append(self, metric, format_string, is_export=False):
+        pass
+
+    def reset():
+        pass
+
+    def update():
+        pass
+
+
 class EstimatedTimeArrival(object):
     def __init__(self, total):
         self.times = [datetime.now()]
@@ -224,7 +244,7 @@ class EstimatedTimeArrival(object):
         self.times.append(datetime.now())
 
     @property
-    def remaining_time(self):
+    def remaining_time(self) -> datetime:
         if len(self.times) == 1:
             raise Exception("Cannot compute the remaining_time")
 
@@ -233,9 +253,14 @@ class EstimatedTimeArrival(object):
         return (self.times[-1]-self.times[0])/n_internals*(remain)
 
     @property
-    def arrival_time(self):
+    def arrival_time(self) -> datetime:
         return datetime.now() + self.remaining_time
 
     @property
-    def cost_time(self):
+    def cost_time(self) -> datetime:
         return self.times[-1]-self.times[0]
+
+    def __str__(self) -> str:
+        return f"remaining_time={self.remaining_time}, " + \
+            f"arrival_time={self.arrival_time}, " + \
+            f"cost_time={self.cost_time}"

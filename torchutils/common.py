@@ -1,19 +1,27 @@
 import os
+import logging
+import time
 import copy
 import socket
 import typing
 import inspect
 import random
 import subprocess
-from functools import wraps
+import pathlib
+import collections
+from functools import partial, reduce, wraps
 
 import numpy
 import torch
 import torch.hub as hub
 import torch.nn as nn
 import torch.optim as optim
+import torch.cuda.amp as amp
+import torch.backends.cudnn
 
 from .distributed import torchsave, is_master
+
+_logger = logging.getLogger(__name__)
 
 
 def is_running_in_openpai() -> bool:
@@ -47,12 +55,23 @@ def set_reproducible(seed: int = 0) -> None:
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    _logger.info(f"Set the training job to be reproducible with seed={seed} "
+                 "(more detailed can be found at https://pytorch.org/docs/stable/notes/randomness.html)")
 
 
 def set_cudnn_auto_tune() -> None:
     """A wrap to set torch.backends.cudnn.benchmark to True.
     """
     torch.backends.cudnn.benchmark = True
+    _logger.info(f"Set torch.backends.cudnn.benchmark=True")
+
+
+def disable_debug_api() -> None:
+    torch.autograd.set_detect_anomaly(False)
+    torch.autograd.profiler.profile(False)
+    torch.autograd.profiler.emit_nvtx(False)
+    _logger.info(f"Disable the debug api for better performance: torch.autograd.set_detect_anomaly, "
+                 "torch.autograd.profiler.profile, and torch.autograd.profiler.emit_nvtx")
 
 
 def compute_nparam(module: nn.Module) -> int:
@@ -79,13 +98,18 @@ def compute_flops(module: nn.Module, size: int) -> int:
     Returns:
         int: The number of MAdds.
     """
-    def size_hook(module: nn.Module, input: torch.Tensor, output: torch.Tensor):
-        *_, h, w = output.shape
-        module.output_size = (h, w)
+    def size_hook(module: nn.Module, input: torch.Tensor, output: torch.Tensor, name: str):
+        module.input_size = input[0].shape
+        module.output_size = output.shape
+
+    def prod(items):
+        return reduce(lambda a, b: a*b, items)
+
     hooks = []
     for name, m in module.named_modules():
-        if isinstance(m, nn.Conv2d):
-            hooks.append(m.register_forward_hook(size_hook))
+        if isinstance(m, (nn.Linear, nn.Conv2d)):
+            hooks.append(m.register_forward_hook(partial(size_hook, name=name)))
+
     with torch.no_grad():
         training = module.training
         module.eval()
@@ -97,11 +121,11 @@ def compute_flops(module: nn.Module, size: int) -> int:
     flops = 0
     for name, m in module.named_modules():
         if isinstance(m, nn.Conv2d):
-            h, w = m.output_size
+            *_, h, w = m.output_size
             kh, kw = m.kernel_size
             flops += h * w * m.in_channels * m.out_channels * kh * kw / m.groups
         if isinstance(m, nn.Linear):
-            flops += m.in_features * m.out_features
+            flops += prod(m.input_size) * m.out_features
     return flops
 
 
@@ -166,45 +190,16 @@ def get_free_port() -> int:
     Returns:
         int: A free port in the machine.
     """
-    sock = socket.socket()
-    sock.bind(('', 0))
-    ip, port = sock.getnameinfo()
-    sock.close()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        _host, port = s.getsockname()
     return port
 
 
-def save_checkpoint(output_directory: str, epoch: int, model: nn.Module, optimizer: optim.Optimizer,
-                    best_acc1: float, best_acc5: float, best_epoch: int) -> None:
-    """Save a checkpoint and the best model in the history.
-
-    Args:
-        output_directory (str): The output directory.
-        epoch (int): The epoch of the current checkpoint.
-        model (nn.Module): The model in current epoch.
-        optimizer (optim.Optimizer): The optimizer in current epoch.
-        best_acc1 (float): The best top-1 accuracy of the model in the history.
-        best_acc5 (float): The best top-5 accuracy of the model in the history.
-        best_epoch (int): The eopch of the best top-1 accuracy in the history.
-    """
-    if isinstance(model, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
-        model_without_parallel = model.module
-    else:
-        model_without_parallel = model
-    ckpt = dict(
-        epoch=epoch,
-        state_dict=model_without_parallel.state_dict(),
-        optimizer=optimizer.state_dict(),
-        best_acc1=best_acc1,
-        best_acc5=best_acc5,
-    )
-    torchsave(ckpt, os.path.join(output_directory, "checkpoint.pth"))
-    if epoch == best_epoch:
-        torchsave(ckpt, os.path.join(output_directory, "best.pth"))
-
-
 class GradientAccumulator:
-    def __init__(self, steps=1):
+    def __init__(self, steps=1, enabled=True):
         self.steps = steps
+        self.enable = enabled
         self._counter = 0
 
     @property
@@ -223,15 +218,28 @@ class GradientAccumulator:
     def is_end_cycle(self):
         return self._counter == self.steps - 1
 
-    def bw_step(self, loss: torch.Tensor, optimizer: optim.Optimizer):
+    def backward_step(self, model: nn.Module, loss: torch.Tensor,
+                      optimizer: optim.Optimizer, scaler: amp.GradScaler):
+        if not self.enable:
+            return
         if optimizer is None:
             return
 
-        loss.backward(gradient=1/self.steps)
+        loss = loss / self.steps
+
         if self.is_start_cycle:
-            optimizer.zero_grad()
+            # if pytorch version >= 1.7, set set_to_none=True for better performance
+            optimizer.zero_grad(set_to_none=True)
+
+        if isinstance(model, nn.parallel.DistributedDataParallel) and not self.is_end_cycle:
+            with model.no_sync():
+                scaler.scale(loss).backward()
+        else:
+            scaler.scale(loss).backward()
+
         if self.is_end_cycle:
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
 
         self.inc_counter()
 
@@ -335,6 +343,138 @@ def patch_download_in_cn():
 
     def _cn_download_url_to_file(url: str, dst, hash_prefix=None, progress=True):
         if url.startswith("https://github.com"):
-            cdn_url = "https://github.91chifun.workers.dev/" + url
+            cdn_url = "https://dl.chenyf.workers.dev/" + url
             return download_url_to_file(cdn_url, dst, hash_prefix, progress)
     hub.download_url_to_file = _cn_download_url_to_file
+
+
+class MetricsStore(collections.defaultdict):
+    def __init__(self, dominant_metric_name: str = None, max_is_best: bool = True):
+        super(MetricsStore, self).__init__(list)
+        self.dominant_metric_name = dominant_metric_name
+        self.max_is_best = max_is_best
+        self.try_to_find = max if self.max_is_best else min
+
+    def set_dominant_metric(self, dominant_metric: str):
+        self.dominant_metric_name = dominant_metric
+
+    @property
+    def best_epoch(self) -> int:
+        try:
+            dominant_metrics = self.get(self.dominant_metric_name)
+        except KeyError:
+            raise KeyError("The dominant_metric_name={dominant_metric_name} are not found in the store.")
+        return dominant_metrics.index(self.try_to_find(dominant_metrics))
+
+    def get_best_metrics(self, key_filter=lambda x: True):
+        return self._get_metrics(self.best_epoch, key_filter)
+
+    def get_last_metrics(self, key_filter=lambda x: True):
+        return self._get_metrics(-1, key_filter)
+
+    def is_best_epoch(self):
+        return self.best_epoch == len(self) - 1
+
+    def _get_metrics(self, index, key_filter=lambda x: True):
+        return {k: v[index] for k, v in self.items() if key_filter(k)}
+
+    def __add__(self, another_metrics: dict):
+        for k, v in another_metrics.items():
+            self[k].append(v)
+        return self
+
+    @property
+    def total_epoch(self):
+        for k, v in self.items():
+            return len(v)
+        return 0
+
+    def as_plain_dict(self):
+        return {k: v for k, v in self.items()}
+
+
+class StateCheckPoint:
+    def __init__(self, output_directory: pathlib.Path, checkpoint_name: str = "checkpoint.pt") -> None:
+        self.output_directory = output_directory
+        self.checkpoint_name = checkpoint_name
+        self.best_checkpoint_name = f"best_{self.checkpoint_name}"
+
+    def is_ckpt_exists(self):
+        return (self.output_directory / self.checkpoint_name).exists()
+
+    @only_master
+    def save(self, metric_store: MetricsStore, states: dict):
+        checkpoint = {k: v.state_dict() for k, v in states.items() if hasattr(v, "state_dict")}
+        checkpoint["metrics"] = metric_store.as_plain_dict()
+
+        torchsave(checkpoint, self.output_directory / self.checkpoint_name)
+
+        if metric_store.is_best_epoch():
+            os.link(self.output_directory / self.checkpoint_name, self.output_directory / self.best_checkpoint_name)
+
+    def restore(self, metric_store: MetricsStore, states: dict, device="cuda:0"):
+        checkpoint_path = self.output_directory / self.checkpoint_name
+        if checkpoint_path.exists():
+            map_location = f"cuda:{device}" if isinstance(device, int) else device
+            checkpoint: dict = torch.load(checkpoint_path, map_location=map_location)
+            metric_store.update(checkpoint.pop("metrics", dict()))
+            for name, module in states.items():
+                if hasattr(module, "load_state_dict"):
+                    module.load_state_dict(checkpoint[name])
+            _logger.info(f"Load state checkpoint from {checkpoint_path} at epoch={metric_store.total_epoch}")
+
+
+class ThroughputTester():
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.batch_size = 0
+        self.start = time.perf_counter()
+
+    def update(self, tensor):
+        batch_size, *_ = tensor.shape
+        self.batch_size += batch_size
+        self.end = time.perf_counter()
+
+    def compute(self):
+        if self.batch_size == 0:
+            return 0
+        else:
+            return self.batch_size/(self.end-self.start)
+
+
+class time_enumerate:
+    def __init__(self, seq, start=0):
+        self.seq = seq
+        self.start = start
+        self.counter = self.start-1
+
+    def __iter__(self):
+        self.seq_iter = iter(self.seq)
+        return self
+
+    def __next__(self):
+        while True:
+            start_time = time.perf_counter()
+            item = next(self.seq_iter)
+            end_time = time.perf_counter()
+            self.counter += 1
+            return end_time-start_time, self.counter, item
+
+
+CURRENT_DEVICE = None
+
+
+def set_proper_device(local_rank: int):
+    global CURRENT_DEVICE
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+        CURRENT_DEVICE = torch.cuda.current_device()
+    else:
+        CURRENT_DEVICE = "cpu"
+
+
+def get_device():
+    global CURRENT_DEVICE
+    return CURRENT_DEVICE

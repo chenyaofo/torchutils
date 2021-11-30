@@ -1,4 +1,6 @@
 import os
+import pathlib
+import shutil
 import typing
 
 import torch
@@ -24,7 +26,7 @@ def patch_OpenPAI_env() -> None:
             os.environ["LOCAL_RANK"] = str(0)
 
 
-def distributed_init(backend: str = "nccl", init_method: str = "env://") -> typing.Tuple[str, str, int, int, int, str, str]:
+def _distributed_init(backend: str = "nccl", init_method: str = "env://") -> typing.Tuple[str, str, int, int, int, str, str]:
     """Quickly initialize the distributed mode in PyTorch by getting informations from environment variables and
     send these to dist.init_process_group.
 
@@ -60,6 +62,14 @@ def distributed_init(backend: str = "nccl", init_method: str = "env://") -> typi
         return None, None, 0, 0, 1, None, None
 
 
+def distributed_init(dist_backend, init_method, world_size, rank):
+    if world_size <= 0:
+        raise ValueError(f"'world_size' should be greater than zero, but got {world_size}")
+    if world_size > 1:
+        dist.init_process_group(backend=dist_backend, init_method=init_method,
+                                world_size=world_size, rank=rank)
+
+
 def is_dist_avail_and_init() -> bool:
     """
 
@@ -77,16 +87,6 @@ def rank() -> int:
         mode is not initialized.
     """
     return dist.get_rank() if is_dist_avail_and_init() else 0
-
-
-def local_rank() -> int:
-    """
-
-    Returns:
-        int: The local rank of the current node in distributed system, return 0 if distributed 
-        mode is not initialized.
-    """
-    return int(os.environ["LOCAL_RANK"]) if is_dist_avail_and_init() else 0
 
 
 def world_size() -> int:
@@ -118,4 +118,7 @@ def torchsave(obj: typing.Any, f: str) -> None:
         f (str): The output file path.
     """
     if is_master():
-        torch.save(obj, f)
+        f: pathlib.Path = pathlib.Path(f)
+        tmp_name = f.with_name("tmp.pt")
+        torch.save(obj, tmp_name)
+        shutil.move(tmp_name, f)
