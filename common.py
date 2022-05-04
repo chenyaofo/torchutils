@@ -1,4 +1,5 @@
 import os
+import uuid
 import logging
 import time
 import copy
@@ -373,7 +374,7 @@ class MetricsStore(collections.defaultdict):
         return self._get_metrics(-1, key_filter)
 
     def is_best_epoch(self):
-        return self.best_epoch == len(self) - 1
+        return self.best_epoch == len(self[self.dominant_metric_name]) - 1
 
     def _get_metrics(self, index, key_filter=lambda x: True):
         return {k: v[index] for k, v in self.items() if key_filter(k)}
@@ -410,7 +411,7 @@ class StateCheckPoint:
         torchsave(checkpoint, self.output_directory / self.checkpoint_name)
 
         if metric_store.is_best_epoch():
-            os.link(self.output_directory / self.checkpoint_name, self.output_directory / self.best_checkpoint_name)
+            torchsave(checkpoint, self.output_directory / self.best_checkpoint_name)
 
     def restore(self, metric_store: MetricsStore, states: dict, device="cuda:0"):
         checkpoint_path = self.output_directory / self.checkpoint_name
@@ -445,10 +446,11 @@ class ThroughputTester():
 
 
 class time_enumerate:
-    def __init__(self, seq, start=0):
+    def __init__(self, seq, start=0, infinite=False):
         self.seq = seq
         self.start = start
         self.counter = self.start-1
+        self.infinite=infinite
 
     def __iter__(self):
         self.seq_iter = iter(self.seq)
@@ -456,11 +458,17 @@ class time_enumerate:
 
     def __next__(self):
         while True:
-            start_time = time.perf_counter()
-            item = next(self.seq_iter)
-            end_time = time.perf_counter()
-            self.counter += 1
-            return end_time-start_time, self.counter, item
+            try:
+                start_time = time.perf_counter()
+                item = next(self.seq_iter)
+                end_time = time.perf_counter()
+                self.counter += 1
+                return end_time-start_time, self.counter, item
+            except StopIteration:
+                if self.infinite:
+                    self.__iter__()
+                else:
+                    raise StopIteration
 
 
 CURRENT_DEVICE = None
@@ -478,3 +486,7 @@ def set_proper_device(local_rank: int):
 def get_device():
     global CURRENT_DEVICE
     return CURRENT_DEVICE
+
+def save_uuid(output_dir:str):
+    with open(os.path.join(output_dir, "uuid"), "w") as f:
+        f.write(uuid.uuid4().__str__().replace("-", ""))

@@ -28,14 +28,14 @@ class Register(dict):
         if TYPE not in cfg:
             raise ValueError(f"There is no type item {self.name} in the cfg.")
         args = cfg.copy()
-        obj_type = args.pop(TYPE)
-        if isinstance(obj_type, str):
-            obj_type = self.get(obj_type)
+        obj_type_name = args.pop(TYPE)
+        if isinstance(obj_type_name, str):
+            obj_type = self.get(obj_type_name)
             if obj_type is None:
                 raise KeyError('{} is not in the {} registry'.format(
-                    obj_type, self.name))
+                    obj_type_name, self.name))
         else:
-            raise ValueError(f"The key {obj_type} must be a string.")
+            raise ValueError(f"The key {obj_type_name} must be a string.")
         if default_args is not None:
             for name, value in default_args.items():
                 args.setdefault(name, value)

@@ -26,6 +26,10 @@ def init_logger(rank: int, filenmae: str = None) -> logging.Logger:
     if rank != 0:
         logging.basicConfig(level=logging.CRITICAL)
     else:
+        _logger = logging.getLogger(__name__)
+        for handler in _logger.handlers[:]:  # make a copy of the list
+            _logger.removeHandler(handler)
+            
         formatter = logging.Formatter(FORMAT)
 
         console_handler = logging.StreamHandler(sys.stdout)
