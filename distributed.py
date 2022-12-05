@@ -1,10 +1,13 @@
 import os
+import logging
 import pathlib
 import shutil
 import typing
 
 import torch
 import torch.distributed as dist
+
+_logger = logging.getLogger(__name__)
 
 
 def patch_OpenPAI_env() -> None:
@@ -52,13 +55,13 @@ def _distributed_init(backend: str = "nccl", init_method: str = "env://") -> typ
                                     init_method=init_method,
                                     world_size=world_size,
                                     rank=rank)
-            print(f"Init distributed mode(backend={backend}, "
-                  f"init_mothod={master_addr}:{master_port}, "
-                  f"rank={rank}, pid={os.getpid()}, world_size={world_size}, "
-                  f"is_master={is_master()}).")
+            _logger.info(f"Init distributed mode(backend={backend}, "
+                         f"init_mothod={master_addr}:{master_port}, "
+                         f"rank={rank}, pid={os.getpid()}, world_size={world_size}, "
+                         f"is_master={is_master()}).")
             return backend, init_method, rank, local_rank, world_size, master_addr, master_port
         else:
-            print("Fail to init distributed because torch.distributed is unavailable.")
+            _logger.critical("Fail to init distributed because torch.distributed is unavailable.")
         return None, None, 0, 0, 1, None, None
 
 
@@ -66,6 +69,10 @@ def distributed_init(dist_backend, init_method, world_size, rank):
     if world_size <= 0:
         raise ValueError(f"'world_size' should be greater than zero, but got {world_size}")
     if world_size > 1:
+        _logger.info(f"Init distributed mode(backend={dist_backend}, "
+                     f"init_mothod={init_method}, "
+                     f"rank={rank}, pid={os.getpid()}, world_size={world_size}, "
+                     f"is_master={is_master()}).")
         dist.init_process_group(backend=dist_backend, init_method=init_method,
                                 world_size=world_size, rank=rank)
 
