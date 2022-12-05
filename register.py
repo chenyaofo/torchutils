@@ -23,6 +23,7 @@ class Register(dict):
         if module_name in self:
             raise KeyError('{} is already registered in {}'.format(module_name, self.name))
         self[module_name] = module
+        return module
 
     def build_from(self, cfg: dict, default_args=None):
         if TYPE not in cfg:
