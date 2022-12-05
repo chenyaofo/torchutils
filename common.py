@@ -11,6 +11,7 @@ import subprocess
 import pathlib
 import collections
 from functools import partial, reduce, wraps
+from typing import List
 
 import numpy
 import torch
@@ -19,6 +20,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.cuda.amp as amp
 import torch.backends.cudnn
+from pyhocon import ConfigFactory, ConfigTree
 
 from .distributed import torchsave, is_master
 
@@ -450,7 +452,7 @@ class time_enumerate:
         self.seq = seq
         self.start = start
         self.counter = self.start-1
-        self.infinite=infinite
+        self.infinite = infinite
 
     def __iter__(self):
         self.seq_iter = iter(self.seq)
@@ -487,6 +489,28 @@ def get_device():
     global CURRENT_DEVICE
     return CURRENT_DEVICE
 
-def save_uuid(output_dir:str):
+
+def save_uuid(output_dir: str):
     with open(os.path.join(output_dir, "uuid"), "w") as f:
         f.write(uuid.uuid4().__str__().replace("-", ""))
+
+
+def apply_modifications(modifications: List[str], conf: ConfigTree):
+    special_cases = {
+        "true": True,
+        "false": False
+    }
+    if modifications is not None:
+        for modification in modifications:
+            key, value = modification.split("=")
+            if value in special_cases.keys():
+                eval_value = special_cases[value]
+            else:
+                try:
+                    eval_value = eval(value)
+                except Exception:
+                    eval_value = value
+            if key not in conf:
+                raise ValueError(f"Key '{key}'' is not in the config tree!")
+            conf.put(key, eval_value)
+    return conf
