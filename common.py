@@ -116,7 +116,7 @@ def compute_flops(module: nn.Module, size: int) -> int:
     with torch.no_grad():
         training = module.training
         module.eval()
-        module(torch.rand(size))
+        module(torch.rand(size, device=list(module.parameters())[0].device))
         module.train(mode=training)
     for hook in hooks:
         hook.remove()
