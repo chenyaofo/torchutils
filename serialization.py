@@ -6,6 +6,7 @@ import torch
 import numpy
 
 CODES_LEN = 4
+ENCODING = "utf-8"
 
 
 @lru_cache(maxsize=128)
@@ -14,7 +15,7 @@ def zero_bytes(legnth: int):
 
 
 def jsonpack(data: dict, maxlen: int):
-    raw_bytes = json.dumps(data).encode()
+    raw_bytes = json.dumps(data).encode(encoding=ENCODING)
     raw_len = len(raw_bytes)
 
     codes = struct.pack("<I", raw_len)
@@ -36,8 +37,8 @@ def jsonunpack(raw_data: bytes):
 
     codes = raw_data[:CODES_LEN]
     raw_len, *_ = struct.unpack("<I", codes)
-    raw_data = raw_data[CODES_LEN:CODES_LEN+raw_len]
+    raw_data: bytes = raw_data[CODES_LEN:CODES_LEN+raw_len]
 
-    data = json.loads(raw_data)
+    data = json.loads(raw_data.decode(encoding=ENCODING))
 
     return data
