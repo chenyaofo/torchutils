@@ -514,3 +514,19 @@ def apply_modifications(modifications: List[str], conf: ConfigTree):
                 raise ValueError(f"Key '{key}'' is not in the config tree!")
             conf.put(key, eval_value)
     return conf
+
+def load_modules(package_file):
+    import os
+    import importlib
+
+    # Get the path to the package folder
+    package_folder = os.path.dirname(package_file)
+
+    # Loop through each file in the package folder and import it if it's a Python module
+    for file in os.listdir(package_folder):
+        file: str
+        if file.endswith(".py") and not file.startswith("__"):
+            module_name = file[:-3]  # Remove the .py extension
+            module_path = f"{__name__}.{module_name}"  # Get the full path to the module
+            print(module_path)
+            importlib.import_module(module_path)
